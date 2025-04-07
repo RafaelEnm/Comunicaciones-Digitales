@@ -1,0 +1,193 @@
+% === Preactividad ===
+clear; clc;
+
+% Parámetros de la señal original
+A = 1;              % Amplitud
+fc = 1000;          % Frecuencia de la señal (Hz)
+dt = 1/100000;      % Intervalo entre muestras (10 µs)
+t_max = 5 / fc;     % Tiempo total de simulación (5 períodos)
+t = 0:dt:t_max;     % Vector de tiempo
+
+% Parámetros del muestreo
+fs = 5000;          % Frecuencia de muestreo (Hz)
+Ts = 1/fs;          % Período de muestreo
+d = 0.5;            % Ciclo de trabajo (50%)
+tau = d * Ts;       % Ancho del pulso
+
+% === Señal original m(t) ===
+m = A * sin(2 * pi * fc * t);
+
+
+% === PAM ===
+
+% === Muestreo Natural ===
+% Tren de pulsos rectangulares (PWM) para el muestreo natural
+pulso_natural = zeros(size(t));
+for n = 0:floor(t_max/Ts)
+idx = (t >= n*Ts) & (t < n*Ts + tau);
+pulso_natural(idx) = 1;
+end
+% Señal modulada por PAM natural
+pam_natural = m .* pulso_natural;
+
+% === Muestreo Instantáneo ===
+% Impulsos ideales (simulados como pulsos muy estrechos)
+pulso_instantaneo = zeros(size(t));
+for n = 0:floor(t_max/Ts)
+% Toma solo un valor puntual dentro de cada período de muestreo
+[~, idx] = min(abs(t - n*Ts));
+pulso_instantaneo(idx) = 1;
+end
+pam_instantanea = m .* pulso_instantaneo;
+
+% === Gráficas ===
+figure('Name','Modulación PAM - Natural vs Instantáneo','NumberTitle','off');
+
+subplot(4,1,1);
+plot(t*1000, m, 'b');
+title('Señal Original m(t)');
+xlabel('Tiempo [ms]');
+ylabel('Amplitud');
+grid on;
+
+subplot(4,1,2);
+plot(t*1000, pam_natural, 'r');
+title('Muestreo Natural (PAM Natural)');
+xlabel('Tiempo [ms]');
+ylabel('Amplitud');
+grid on;
+
+subplot(4,1,3);
+stem(t*1000, pam_instantanea, 'g', 'Marker','none');
+title('Muestreo Instantáneo (PAM Instantáneo)');
+xlabel('Tiempo [ms]');
+ylabel('Amplitud');
+grid on;
+
+subplot(4,1,4);
+plot(t*1000, m, 'b', 'DisplayName','Original'); hold on;
+plot(t*1000, pam_natural, 'r', 'DisplayName','Natural');
+stem(t*1000, pam_instantanea, 'g', 'Marker','none', 'DisplayName','Instantáneo');
+title('Comparación de las tres señales');
+xlabel('Tiempo [ms]');
+ylabel('Amplitud');
+legend;
+grid on;
+
+% === Transformada de Fourier ===
+
+% === Cálculo de la FFT ===
+N = length(t);
+f = linspace(0, 1/(2*dt), N/2);  % Frecuencias positivas
+
+% Aplicamos FFT y normalizamos
+M_f = abs(fft(m)/N);
+PAM_nat_f = abs(fft(pam_natural)/N);
+PAM_inst_f = abs(fft(pam_instantanea)/N);
+
+% Solo la mitad positiva
+M_f = M_f(1:N/2);
+PAM_nat_f = PAM_nat_f(1:N/2);
+PAM_inst_f = PAM_inst_f(1:N/2);
+
+% === Gráficas de espectro ===
+figure('Name','Espectros en frecuencia','NumberTitle','off');
+
+subplot(4,1,1);
+plot(f/1000, M_f, 'b');
+title('Espectro |M(f)| - Señal Original');
+xlabel('Frecuencia [kHz]');
+ylabel('Magnitud');
+grid on;
+xlim([0 50]);  % Límite de 50 kHz para mejor visualización
+
+subplot(4,1,2);
+plot(f/1000, PAM_nat_f, 'r');
+title('Espectro - Muestreo Natural');
+xlabel('Frecuencia [kHz]');
+ylabel('Magnitud');
+grid on;
+xlim([0 50]);
+
+subplot(4,1,3);
+plot(f/1000, PAM_inst_f, 'g');
+title('Espectro - Muestreo Instantáneo');
+xlabel('Frecuencia [kHz]');
+ylabel('Magnitud');
+grid on;
+xlim([0 50]);
+
+subplot(4,1,4);
+plot(f/1000, M_f, 'b', 'DisplayName','Original'); hold on;
+plot(f/1000, PAM_nat_f, 'r', 'DisplayName','Natural');
+plot(f/1000, PAM_inst_f, 'g', 'DisplayName','Instantáneo');
+title('Comparación de los tres espectros');
+xlabel('Frecuencia [kHz]');
+ylabel('Magnitud');
+legend;
+grid on;
+xlim([0 50]);
+
+
+% === PCM ===
+
+N = 8; % Número de bits para PCM
+pcm_levels = 2^N; % Total de niveles PCM
+
+% Cuantizar la señal instantánea usando PCM
+pcm_signal_inst = round((pam_instantanea + 1) * (pcm_levels - 1) / 2); % Cuantización
+
+% Normaliza las señales para que estén en el mismo rango de amplitud (0 a 1)
+m_t_norm = (m - min(m)) / (max(m) - min(m));
+m_t_inst_norm = (pam_instantanea - min(pam_instantanea )) / (max(pam_instantanea) - min(pam_instantanea));
+pcm_signal_inst_norm = (pcm_signal_inst - min(pcm_signal_inst)) / (max(pcm_signal_inst) - min(pcm_signal_inst));
+
+% Calcular el error de cuantización para la señal PAM cuantificada (PCM)
+quantization_error_inst = pam_instantanea - ((2 * pcm_signal_inst / (pcm_levels - 1)) - 1);
+
+% Crear una figura para mostrar todas las señales en un mismo gráfico
+figure;
+
+% Graficar la señal original en azul
+plot(t, m_t_norm, 'b', 'LineWidth', 1.5);
+hold on;
+
+% Graficar la señal PAM instantánea en rojo
+plot(t, m_t_inst_norm, 'r', 'LineWidth', 1.5);
+
+% Graficar la señal PAM cuantificada (PCM) en verde (usar marcador 'o' para visualizar los puntos PCM)
+
+muestreo_idxs = find(pulso_instantaneo == 1);
+
+% Extraer tiempo y señal cuantificada solo en los instantes de muestreo
+t_muestreo = t(muestreo_idxs);
+pcm_muestreo = pcm_signal_inst_norm(muestreo_idxs);
+
+% Dibujar líneas verticales entre PAM instantánea y cuantizada (PCM)
+for i = 1:length(t_muestreo)
+    % Línea vertical del valor PAM instantáneo al cuantizado
+    line([t_muestreo(i), t_muestreo(i)], ...
+         [m_t_inst_norm(muestreo_idxs(i)), pcm_muestreo(i)], ...
+         'Color', 'g', 'LineStyle', '--', 'LineWidth', 1);
+end
+
+% Dibujar puntos PCM cuantificados
+plot(t_muestreo, pcm_muestreo, 'go', 'MarkerFaceColor', 'g');
+
+
+% Establecer etiquetas y título del gráfico
+xlabel('Tiempo (s)');
+ylabel('Amplitud Normalizada');
+title('Señal Original, Señal PAM Instantánea y Señal PAM Cuantificada (PCM)');
+legend('Señal Original', 'Señal PAM Instantánea', 'Señal PAM Cuantificada (PCM)');
+grid on;
+
+% Crear una nueva figura para mostrar el error de cuantización
+figure;
+
+% Graficar el error de cuantización para la señal PAM cuantificada (PCM)
+plot(t, quantization_error_inst, 'k--', 'LineWidth', 1.5);
+xlabel('Tiempo (s)');
+ylabel('Error de Cuantización');
+title('Error de Cuantización para la Señal PAM Cuantificada (PCM)');
+grid on;
