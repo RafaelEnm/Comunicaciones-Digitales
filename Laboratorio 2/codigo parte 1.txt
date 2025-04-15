@@ -1,0 +1,68 @@
+clc;
+clear;
+close all;
+
+% Parámetros base
+f0 = 1;         % Frecuencia de corte básica (puedes ajustar)
+B = f0 * 1.5;   % Ancho de banda total para visualización
+t = linspace(0, 5/f0, 1000);     % Tiempo solo para t >= 0
+f = linspace(-2*B, 2*B, 1000);   % Frecuencia de -2B a 2B
+alphas = [0, 0.25, 0.75, 1];     % Factores de roll-off
+
+% Figuras
+figure('Name','Respuesta en el Tiempo (Impulso)','NumberTitle','off');
+hold on;
+title('Respuesta al Impulso h_e(t) para distintos \alpha');
+xlabel('t'); ylabel('h_e(t)');
+
+% Parte de frecuencia
+
+figure('Name','Respuesta en Frecuencia','NumberTitle','off');
+hold on;
+title('Respuesta en Frecuencia H_e(f) para distintos \alpha');
+xlabel('f'); ylabel('H_e(f)');
+
+% Loop para cada valor de alpha
+for a = 1:length(alphas)
+    alpha = alphas(a);
+    f1 = f0 * (1 - alpha);
+    f2 = f0 * (1 + alpha);
+    f_delta = (f2 - f1)/2;
+
+    % RESPUESTA EN FRECUENCIA (coseno alzado)
+    H = zeros(size(f));
+    for i = 1:length(f)
+        absf = abs(f(i));
+        if absf < f1
+            H(i) = 1;
+        elseif absf >= f1 && absf <= f2
+            H(i) = 0.5 * (1 + cos(pi * (absf - f1)/(2*f_delta)));
+        else
+            H(i) = 0;
+        end
+    end
+
+    figure(2); % frecuencia
+    plot(f, H, 'DisplayName', ['\alpha = ', num2str(alpha)]);
+
+    % RESPUESTA AL IMPULSO (transformada inversa)
+    % Fórmula cerrada:
+    he = zeros(size(t));
+    for i = 1:length(t)
+        tt = t(i);
+        if abs(4*f_delta*tt) == 1
+            he(i) = 0; % evitar singularidad
+        else
+            sinc_part = sin(2*pi*f0*tt)/(2*pi*f0*tt);
+            cos_part = cos(2*pi*f_delta*tt)/(1 - (4*f_delta*tt)^2);
+            he(i) = 2*f0 * sinc_part * cos_part;
+        end
+    end
+
+    figure(1); % impulso
+    plot(t, he, 'DisplayName', ['\alpha = ', num2str(alpha)]);
+end
+
+% Mostrar leyendas
+figure(1); legend(); grid on;
+figure(2); legend(); grid on;

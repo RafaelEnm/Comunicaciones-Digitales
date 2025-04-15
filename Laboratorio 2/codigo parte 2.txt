@@ -1,0 +1,52 @@
+% Parámetros generales
+num_bits = 104;            % Número de bits a transmitir
+alpha_values = [0, 0.25, 0.75, 1];  % Valores del roll-off
+Rb = 100;                  % Tasa de bits (bits por segundo)
+fs = 500;                 % Frecuencia de muestreo (Hz)
+Ts = 1 / Rb;               % Duración de símbolo (s)
+samples_per_symbol = fs / Rb;  % Muestras por símbolo (calculado)
+Tsamp = 1 / fs;            % Tiempo entre muestras (calculado)
+snr_db = 20;               % Relación señal a ruido en dB
+
+% Generar secuencia binaria aleatoria NRZ-L
+bits = randi([0 1], 1, num_bits);
+symbols = 2 * bits - 1;  % NRZ-L: 0 -> -1, 1 -> +1
+
+% Tiempo para el diagrama de ojo (2 símbolos)
+symbols_per_eye = 2;
+samples_per_eye = round(samples_per_symbol * symbols_per_eye);  % Redondear por seguridad
+t = (0:samples_per_eye-1) * Tsamp;  % Eje x en segundos
+
+figure;
+for i = 1:length(alpha_values)
+    alpha = alpha_values(i);
+
+    % Diseñar filtro coseno alzado
+    rrcFilter = rcosdesign(alpha, 6, samples_per_symbol, 'sqrt');
+
+    % Sobremuestrear y filtrar
+    upsampled = upsample(symbols, round(samples_per_symbol));
+    tx_signal = conv(upsampled, rrcFilter, 'same');
+
+    % Agregar ruido AWGN manualmente
+    signal_power = mean(tx_signal.^2);
+    snr_linear = 10^(snr_db / 10);
+    noise_power = signal_power / snr_linear;
+    noise = sqrt(noise_power) * randn(size(tx_signal));
+    noisy_signal = tx_signal + noise;
+
+    % Diagrama de ojo manual
+    num_eyes = floor(length(noisy_signal) / samples_per_eye);
+    subplot(2, 2, i);
+    hold on;
+    for k = 1:num_eyes
+        idx = (k-1) * samples_per_eye + 1;
+        if idx + samples_per_eye - 1 <= length(noisy_signal)
+            plot(t, noisy_signal(idx:idx + samples_per_eye - 1), 'b');
+        end
+    end
+    title(['Diagrama de ojo (α = ', num2str(alpha), ')']);
+    xlabel('Tiempo [s]');
+    ylabel('Amplitud');
+    grid on;
+end
