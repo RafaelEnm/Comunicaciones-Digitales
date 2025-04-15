@@ -2,7 +2,7 @@
 num_bits = 1e4;            % Número de bits a transmitir
 alpha_values = [0, 0.25, 0.75, 1];  % Valores del roll-off
 Rb = 100;                  % Tasa de bits (bits por segundo)
-fs = 500;                 % Frecuencia de muestreo (Hz)
+fs = 2000;                 % Frecuencia de muestreo (Hz)
 Ts = 1 / Rb;               % Duración de símbolo (s)
 samples_per_symbol = fs / Rb;  % Muestras por símbolo (calculado)
 Tsamp = 1 / fs;            % Tiempo entre muestras (calculado)
